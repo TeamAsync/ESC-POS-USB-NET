@@ -1,13 +1,13 @@
-﻿using ESC_POS_USB_NET.Enums;
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
+using ESC_POS_USB_NET.Enums;
 using ESC_POS_USB_NET.EpsonCommands;
-using ESC_POS_USB_NET.Extensions;
 using ESC_POS_USB_NET.Helper;
 using ESC_POS_USB_NET.Interfaces.Command;
 using ESC_POS_USB_NET.Interfaces.Printer;
-using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.Text;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace ESC_POS_USB_NET.Printer
 {
@@ -17,9 +17,11 @@ namespace ESC_POS_USB_NET.Printer
         private readonly string _printerName;
         private readonly IPrintCommand _command;
         private readonly string _codepage;
-        public Printer(string printerName, string codepage= "IBM860")
+        public Printer(string printerName, string codepage = "IBM860")
         {
             _printerName = string.IsNullOrEmpty(printerName) ? "escpos.prn" : printerName.Trim();
+            var provider = System.Text.CodePagesEncodingProvider.Instance;
+            Encoding.RegisterProvider(provider);
             _command = new EscPos();
             _codepage = codepage;
         }
@@ -109,7 +111,7 @@ namespace ESC_POS_USB_NET.Printer
 
         public void Separator(char speratorChar = '-')
         {
-            Append(_command.Separator(speratorChar ));
+            Append(_command.Separator(speratorChar));
         }
 
         public void AutoTest()
@@ -264,24 +266,24 @@ namespace ESC_POS_USB_NET.Printer
             Append(_command.QrCode.Print(qrData));
         }
 
-        public void QrCode(string qrData, QrCodeSize qrCodeSize )
+        public void QrCode(string qrData, QrCodeSize qrCodeSize)
         {
             Append(_command.QrCode.Print(qrData, qrCodeSize));
         }
 
         public void Code128(string code, Positions printString = Positions.NotPrint)
         {
-            Append(_command.BarCode.Code128(code,  printString));
+            Append(_command.BarCode.Code128(code, printString));
         }
 
-        public void Code39(string code, Positions printString=Positions.NotPrint)
+        public void Code39(string code, Positions printString = Positions.NotPrint)
         {
-            Append(_command.BarCode.Code39(code,  printString));
+            Append(_command.BarCode.Code39(code, printString));
         }
 
         public void Ean13(string code, Positions printString = Positions.NotPrint)
         {
-            Append(_command.BarCode.Ean13(code,  printString));
+            Append(_command.BarCode.Ean13(code, printString));
         }
 
         public void InitializePrint()
@@ -289,7 +291,7 @@ namespace ESC_POS_USB_NET.Printer
             RawPrinterHelper.SendBytesToPrinter(_printerName, _command.InitializePrint.Initialize());
         }
 
-        public void Image(Bitmap image)
+        public void Image(Image<Rgba32> image)
         {
             Append(_command.Image.Print(image));
         }

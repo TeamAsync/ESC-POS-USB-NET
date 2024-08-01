@@ -1,49 +1,92 @@
-﻿using System.Collections;
-using System;
+﻿using System;
+using System.Collections;
 using System.IO;
 using ESC_POS_USB_NET.Interfaces.Command;
-using System.Drawing;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Processing;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace ESC_POS_USB_NET.EpsonCommands
 {
     public class Image : IImage
     {
-        private static BitmapData GetBitmapData(Bitmap bmp)
+        private static BitmapData GetBitmapData(Image<Rgba32> image)
         {
-  
-                var threshold = 127;
-                var index = 0;
-                double multiplier = 576; // this depends on your printer model.
-                double scale = (double)(multiplier / (double)bmp.Width);
-                int xheight = (int)(bmp.Height * scale);
-                int xwidth = (int)(bmp.Width * scale);
-                var dimensions = xwidth * xheight;
-                var dots = new BitArray(dimensions);
+            var threshold = 127;
+            var index = 0;
+            double multiplier = 530; // this depends on your printer model.
+            double scale = multiplier / image.Width;
+            int xheight = (int)(image.Height * scale);
+            int xwidth = (int)(image.Width * scale);
+            var dimensions = xwidth * xheight;
+            var dots = new BitArray(dimensions);
 
-                for (var y = 0; y < xheight; y++)
+            image.Mutate(x => x.Resize(xwidth, xheight));
+
+            image.ProcessPixelRows(accessor =>
+            {
+                for (int y = 0; y < accessor.Height; y++)
                 {
-                    for (var x = 0; x < xwidth; x++)
+                    Span<Rgba32> pixelRow = accessor.GetRowSpan(y);
+
+                    for (int x = 0; x < pixelRow.Length; x++)
                     {
-                        var _x = (int)(x / scale);
-                        var _y = (int)(y / scale);
-                        var color = bmp.GetPixel(_x, _y);
-                        var luminance = (int)(color.R * 0.3 + color.G * 0.59 + color.B * 0.11);
+                        ref Rgba32 pixel = ref pixelRow[x];
+                        var luminance = (int)(pixel.R * 0.3 + pixel.G * 0.59 + pixel.B * 0.11);
                         dots[index] = (luminance < threshold);
                         index++;
                     }
                 }
+            });
 
-                return new BitmapData()
-                {
-                    Dots = dots,
-                    Height = (int)(bmp.Height * scale),
-                    Width = (int)(bmp.Width * scale)
-                };
-       
+            return new BitmapData()
+            {
+                Dots = dots,
+                Height = xheight,
+                Width = xwidth
+            };
         }
 
-        byte[] IImage.Print(Bitmap image)
+        private static Image<Rgba32> CropImage(Image<Rgba32> image)
         {
+            // Detect the area of interest
+            int left = image.Width, right = 0, top = image.Height, bottom = 0;
+
+            image.ProcessPixelRows(accessor =>
+            {
+                for (int y = 0; y < accessor.Height; y++)
+                {
+                    Span<Rgba32> pixelRow = accessor.GetRowSpan(y);
+
+                    for (int x = 0; x < pixelRow.Length; x++)
+                    {
+                        ref Rgba32 pixel = ref pixelRow[x];
+                        // Adjust these conditions to detect your label area correctly
+                        if (pixel.R < 250 || pixel.G < 250 || pixel.B < 250)
+                        {
+                            if (x < left) left = x;
+                            if (x > right) right = x;
+                            if (y < top) top = y;
+                            if (y > bottom) bottom = y;
+                        }
+                    }
+                }
+            });
+
+            // Ensure the cropping is within bounds
+            left = Math.Max(0, left - 10);
+            right = Math.Min(image.Width, right + 10);
+            top = Math.Max(0, top - 10);
+            bottom = Math.Min(image.Height, bottom + 10);
+
+            return image.Clone(ctx => ctx.Crop(new Rectangle(left, top, right - left, bottom - top)));
+        }
+
+        byte[] IImage.Print(Image<Rgba32> image)
+        {
+            // Crop the image to only include the label part
+            image = CropImage(image);
+
             var data = GetBitmapData(image);
             BitArray dots = data.Dots;
             byte[] width = BitConverter.GetBytes(data.Width);
@@ -113,4 +156,3 @@ namespace ESC_POS_USB_NET.EpsonCommands
         public int Width { get; set; }
     }
 }
-
