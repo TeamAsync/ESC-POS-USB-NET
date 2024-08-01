@@ -14,7 +14,7 @@ namespace ESC_POS_USB_NET.EpsonCommands
         {
             var threshold = 127;
             var index = 0;
-            double multiplier = 530; // this depends on your printer model.
+            double multiplier = 505; // this depends on your printer model.
             double scale = multiplier / image.Width;
             int xheight = (int)(image.Height * scale);
             int xwidth = (int)(image.Width * scale);
