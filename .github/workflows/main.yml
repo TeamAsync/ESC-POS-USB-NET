@@ -1,0 +1,30 @@
+name: Publish Package
+on:
+  push:
+    branches: [ "master" ]
+
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Bump version and push tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.PRIVATE_REPO_PASSWORD }}
+      - name: Set VERSION variable from tag
+        run: echo "VERSION=${TAG_VERSION/v/}" >> $GITHUB_ENV
+        env:
+          TAG_VERSION: ${{ steps.tag_version.outputs.new_tag }}
+      - name: Add github source
+        run: dotnet nuget add source --username ${{ secrets.PRIVATE_REPO_USERNAME }} --password ${{ secrets.PRIVATE_REPO_PASSWORD }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/TeamAsync/index.json"
+      - name: Build
+        run: dotnet build ./ESC-POS-USB-NET/ESC-POS-USB-NET.csproj --configuration Release /p:Version=${VERSION} /p:PublishAot=true
+      - name: Pack
+        run: dotnet pack --configuration Release ./ESC-POS-USB-NET/ESC-POS-USB-NET.csproj /p:Version=${VERSION} --no-build --output .
+      - name: Push
+        run: dotnet nuget push ./TeamAsync.ESC-POS-USB-NET.${VERSION}.nupkg -k ${{ secrets.PRIVATE_REPO_PASSWORD }} -s "github"
